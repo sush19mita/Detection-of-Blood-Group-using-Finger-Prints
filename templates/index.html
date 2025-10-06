@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Group Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 400px;
+        }
+        h2 {
+            color: #333;
+        }
+        input[type="file"] {
+            margin: 15px 0;
+        }
+        button {
+            background: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Blood Group Detection</h2>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" name="file" id="file" required>
+            <br>
+            <button type="submit">Upload & Predict</button>
+        </form>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById("upload-form").onsubmit = async (e) => {
+            e.preventDefault();
+            let formData = new FormData();
+            let fileInput = document.getElementById("file");
+            formData.append("file", fileInput.files[0]);
+
+            let response = await fetch("/predict", {
+                method: "POST",
+                body: formData
+            });
+
+            let resultDiv = document.getElementById("result");
+            if (response.ok) {
+                let data = await response.json();
+                resultDiv.innerHTML = `
+                    <b>Prediction:</b> ${data.predicted_label} <br>
+                    <b>Confidence:</b> ${(data.confidence * 100).toFixed(2)}%
+                `;
+            } else {
+                resultDiv.innerHTML = "Error: Could not predict. Please try again.";
+            }
+        };
+    </script>
+</body>
+</html>
