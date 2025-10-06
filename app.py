@@ -1,103 +1,59 @@
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
 import numpy as np
 import tensorflow as tf
-import cv2
+import cv2   # will use opencv-python-headless
 import os
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+
+# Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import ssl
-from werkzeug.utils import secure_filename
-from tensorflow.keras.preprocessing.image import load_img, img_to_array, save_image
 
-#disable SSL verifucation for downloading pre-trained models, if needed
-ssl._create_default_https_context = ssl._create_unverified_context
+# Load your trained model
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model("models/high_acc_model.h5")
 
-app = Flask(__name__)
+model = load_model()
 
-#load the pre-trained model
-model = tf.keras.models.load_model('models/high_acc_model.h5')
+# Define class names
+CLASS_NAMES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
-#define the allowed extensions for the uploaded files
-ALLOWED_EXTENSIONS= {'png','jpg','jpeg','bmp'}
-
-#function to check allowed file extensions
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.',1)[1].lower() in ALLOWED_EXTENSIONS
-
-def preprocess_image(file_path):
-    '''
-    preprocess the image for model prediction
-    Args:
-        file path (str) : Path to the image file.
-
-    Returns:
-        numpy.ndarray: preprocessed image ready for prediction.
-
-    '''
-
-    img = load_img(file_path, target_size=(64, 64)) #resize to match the model's input size
-    img_array = img_to_array(img) # converts image to image array
-    img_array = np.expand_dims(img_array, axis=0) #add batch dimension
+# Function to preprocess image
+def preprocess_image(img):
+    img = load_img(img, target_size=(64, 64))  # resize
+    img_array = img_to_array(img)  
+    img_array = np.expand_dims(img_array, axis=0)  
     return img_array
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+# Streamlit UI
+st.title("🩸 Blood Group Detection from Fingerprints")
 
-#Endpoint to predict the blood group from fingerprint image
-@app.route('/predict', methods=['POST'])
-def predict():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}),400
+st.write("Upload a fingerprint image to predict the blood group.")
 
-    file = request.files['file']
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png", "bmp"])
 
-    if file.filename == '':
-        return jsonify({'error': 'No files selected'}), 400
+if uploaded_file is not None:
+    # Display uploaded image
+    st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
 
-    if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file type. Allowed types are png, jpg, jpeg'}),400
+    if st.button("Predict Blood Group"):
+        try:
+            # Preprocess
+            img = preprocess_image(uploaded_file)
 
-    #save the uploaded file
-    filename = secure_filename(file.filename)
-    file_path = os.path.join('uploads', filename)
-    file.save(file_path)
+            # Predict
+            predictions = model.predict(img)
+            predicted_class = int(np.argmax(predictions[0]))
+            confidence = round(float(np.max(predictions[0])) * 100, 2)
 
-    try:
-        #Preprocessing the image
-        img = preprocess_image(file_path)
+            if predicted_class < len(CLASS_NAMES):
+                predicted_label = CLASS_NAMES[predicted_class]
+            else:
+                predicted_label = "Unknown"
 
-        #Perform prediction
-        predictions = model.predict(img)
-        predicted_class = int(np.argmax(predictions[0]))
-        print('Predicted class is: ', predicted_class)
+            # Show results
+            st.success(f"### Predicted Blood Group: **{predicted_label}**")
+            st.info(f"Confidence: {confidence}%")
 
-        #Optional: Define class names (if not in the model)
-        class_names = ['A+','A-','B+','B-','AB+','AB-','O+','O-'] #example classes
-        if predicted_class >= len(class_names):
-            predicted_label = "Unknown"
-        else:
-            predicted_label = class_names[predicted_class]
-
-        #Return the result as JSON
-        return jsonify({
-            'predicted_class': predicted_class,
-            'predicted_label': predicted_label,
-            'confidence': round(float(np.max(predictions[0])) * 100, 2)
-
-
-        })
-
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
-    finally:
-        #Clean up: remove the saved file
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            
-
-if __name__ == '__main__':
-    if not os.path.exists('uploads'):
-        os.makedirs('uploads')
-    app.run(debug=True)
+        except Exception as e:
+            st.error(f"Error during prediction: {str(e)}")
