@@ -3,6 +3,7 @@ tensorflow
 numpy
 pillow
 werkzeug
-gunicorn
+streamlit
+opencv-python-headless
 
 
