@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 import tensorflow as tf
-import cv2   # will use opencv-python-headless
 import os
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
@@ -11,7 +10,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 # Load your trained model
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("models/high_acc_model.h5")
+    return tf.keras.models.load_model("model/high_acc_model.h5")
 
 model = load_model()
 
